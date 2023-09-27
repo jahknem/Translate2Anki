@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Photo Translator</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <style>
+	body, html {
+	  margin: 0;
+	  padding: 0;
+	  height: 100%;
+	  width: 100%;
+	}
+	#webcam {
+	  position: fixed;
+	  top: 0;
+	  left: 0;
+	  min-width: 100%;
+	  min-height: 100%;
+	  z-index: -1;
+	}
+	.btn-floating {
+	  position: fixed;
+	}
+	.capture-btn {
+	  bottom: 20px;
+	  left: 50%;
+	  transform: translateX(-50%);
+	}
+	.close-btn {
+	  top: 20px;
+	  right: 20px;
+	}
+	.menu-btn {
+	  top: 20px;
+	  left: 20px;
+	}
+  </style>
+</head>
+
+<body>
+	<!-- Webcam view -->
+	<video id="webcam" autoplay></video>
+  
+	<!-- Floating Action Buttons -->
+<!-- Floating Action Buttons -->
+<a class="btn-floating btn-large waves-effect waves-light red capture-btn" onclick="captureImage()"><i class="material-icons">camera_alt</i></a>
+<a class="btn-floating btn-small waves-effect waves-light blue close-btn" onclick="clearCapture()"><i class="material-icons">close</i></a>
+<a class="btn-floating btn-small waves-effect waves-light green menu-btn" onclick="toggleLogs()"><i class="material-icons">menu</i></a>
+
+  
+	<!-- Side Navigation (for logs) -->
+	<ul id="slide-out" class="sidenav">
+	  <li><div class="user-view">
+		<div class="background">
+		  <img src="images/office.jpg">
+		</div>
+		<a href="#user"><img class="circle" src="images/yuna.jpg"></a>
+		<a href="#name"><span class="white-text name">Logs</span></a>
+	  </div></li>
+	  <li><div class="divider"></div></li>
+	  <li><a class="subheader">Activity Logs</a></li>
+	  <li id="sidenavLogs"><a class="waves-effect" href="#!">Initial Log</a></li>
+	  <!-- Add more logs here -->
+	</ul>
+  
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+	<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			var elems = document.querySelectorAll('.sidenav');
+			var instances = M.Sidenav.init(elems);
+		});
+	
+		function logMessage(message) {
+			const logsDiv = document.getElementById('logs');
+			const sidenavLogs = document.getElementById('sidenavLogs');
+			logsDiv.innerHTML += message + '<br>';
+			// Create new log list item
+			const newLogItem = document.createElement('li');
+
+			// Create new anchor element and set its text and classes
+			const newLogAnchor = document.createElement('a');
+			newLogAnchor.textContent = message;
+			newLogAnchor.className = 'waves-effect';
+
+			// Append new anchor to new list item
+			newLogItem.appendChild(newLogAnchor);
+
+			// Append new list item to sidenavLogs
+			sidenavLogs.appendChild(newLogItem);
+		}
+	
+		navigator.mediaDevices.getUserMedia({ video: true })
+			.then(stream => {
+				const video = document.getElementById('webcam');
+				video.srcObject = stream;
+			});
+	
+		let capturedImage;
+	
+		function captureImage() {
+			const video = document.getElementById('webcam');
+			const canvas = document.createElement('canvas');
+			canvas.width = video.videoWidth;
+			canvas.height = video.videoHeight;
+			const ctx = canvas.getContext('2d');
+			ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+			capturedImage = canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
+			processImage();
+		}
+	
+		async function processImage() {
+			try {
+				logMessage('Starting image processing...');
+				let response;
+				if (capturedImage) {
+				response = await fetch('http://localhost:5000/process_image', {
+					method: 'POST',
+					headers: {
+					'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ image: capturedImage })
+				});
+				} else {
+				const fileInput = document.getElementById('imageUpload');
+				const formData = new FormData();
+				formData.append('image', fileInput.files[0]);
+				response = await fetch('http://localhost:5000/process_image', {
+					method: 'POST',
+					body: formData
+				});
+				}
+		
+				if (response.ok) {
+				const data = await response.json();
+				logMessage(`Received OCR Text: ${data.ocr_text}`);
+				logMessage(`Received Translated Text: ${data.translated_text}`);
+				} else {
+				logMessage(`Received error status from server: ${response.status}`);
+				}
+			} catch (error) {
+				logMessage(`An error occurred: ${error}`);
+			}
+		}
+
+		function clearCapture() {
+			capturedImage = null;
+			const video = document.getElementById('webcam');
+			video.style.display = 'block';
+			// Add more logic to clear the screen and variables if needed
+		}
+		  
+		function toggleLogs() {
+		var instance = M.Sidenav.getInstance(document.getElementById('slide-out'));
+		instance.isOpen ? instance.close() : instance.open();
+		}
+		  
+		  // Initialize side-nav
+		  document.addEventListener('DOMContentLoaded', function() {
+			var elems = document.querySelectorAll('.sidenav');
+			var instances = M.Sidenav.init(elems);
+		  });
+	  </script>
+	</body>
+  </html>
+
+  

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Photo Translator</title>
+  <style>
+    /* Add your CSS styling here */
+  </style>
+</head>
+<body>
+
+  <h1>Photo Translator</h1>
+
+  <!-- Webcam view -->
+  <video id="webcam" width="640" height="480" autoplay></video>
+  <button onclick="captureImage()">Capture</button>
+
+  <!-- Image upload as an alternative -->
+  <input type="file" id="imageUpload" accept="image/*">
+  <button onclick="processImage()">Translate</button>
+
+  <h2>OCR Text:</h2>
+  <div id="ocrText"></div>
+
+  <h2>Translated Text:</h2>
+  <div id="translatedText"></div>
+  <h2>Logs:</h2>
+  <div id="logs"></div>
+  
+  <script>
+    // Log messages to the webpage
+    function logMessage(message) {
+      const logsDiv = document.getElementById('logs');
+      logsDiv.innerHTML += message + '<br>';
+    }
+    // Initialize webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        const video = document.getElementById('webcam');
+        video.srcObject = stream;
+      });
+
+    let capturedImage;
+
+    // Capture image from webcam
+    function captureImage() {
+      const video = document.getElementById('webcam');
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      capturedImage = canvas.toDataURL('image/png').replace('data:image/png;base64,', '');
+      processImage();
+    }
+
+    // Process and translate image
+    async function processImage() {
+      try {
+        logMessage('Starting image processing...');
+        let response;
+        if (capturedImage) {
+          // Sending base64 image as JSON
+          response = await fetch('http://localhost:5000/process_image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ image: capturedImage })
+          });
+        } else {
+          // Sending uploaded image as FormData
+          const fileInput = document.getElementById('imageUpload');
+          const formData = new FormData();
+          formData.append('image', fileInput.files[0]);
+          response = await fetch('http://localhost:5000/process_image', {
+            method: 'POST',
+            body: formData
+          });
+        }
+
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById('ocrText').innerText = data.ocr_text;
+          document.getElementById('translatedText').innerText = data.translated_text;
+          logMessage(`Received OCR Text: ${data.ocr_text}`);
+          logMessage(`Received Translated Text: ${data.translated_text}`);
+        } else {
+          logMessage(`Received error status from server: ${response.status}`);
+        }
+      } catch (error) {
+        logMessage(`An error occurred: ${error}`);
+      }
+    }
+
+  </script>
+
+</body>
+</html>
